@@ -36,7 +36,7 @@ bpm=120
 ```
 
 ### Como Compilar 
-```python
+```bash
 bison -d parser.y        
 flex scanner.l           
 gcc parser.tab.c lex.yy.c -o analisador -Wall
