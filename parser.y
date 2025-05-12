@@ -14,6 +14,8 @@ void yyerror(const char *s);
 %token SILENCIO X ABRE_PAREN FECHA_PAREN MAIS BARRA NEWLINE
 %token <num> NUMERO
 
+%left MAIS
+
 %%
 
 programa:
@@ -49,7 +51,9 @@ evento:
         printf("Silêncio\n");
     }
     | repeticao
-    | agrupamento
+    | evento MAIS evento {
+        printf("Agrupamento de eventos\n");
+    }
     ;
 
 toque:
@@ -86,12 +90,6 @@ instrumento:
 repeticao:
     ABRE_PAREN evento FECHA_PAREN X NUMERO {
         printf("Repetição anterior %d vezes\n", $5);
-    }
-    ;
-
-agrupamento:
-    evento MAIS evento {
-        printf("Agrupamento de eventos\n");
     }
     ;
 
