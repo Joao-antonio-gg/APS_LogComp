@@ -33,3 +33,12 @@ bpm=120
 @! #& |
 @! #& |
 (#&)@! x2 |
+```
+
+### Como Compilar 
+```bash
+bison -d parser.y        
+flex scanner.l           
+gcc parser.tab.c lex.yy.c -o analisador -Wall
+./analisador < entrada.txt
+```
