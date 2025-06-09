@@ -1,5 +1,8 @@
 %{
 #include "parser.tab.h"
+#include <stdlib.h>
+
+void yyerror(const char *s);
 %}
 
 %%
@@ -25,6 +28,4 @@
 
 %%
 
-int yywrap() {
-    return 1;
-}
+int yywrap() { return 1; }
