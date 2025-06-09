@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include "parser.tab.h"
 
-// Protótipos da AST do parser
 extern Programa programa;
 
 void tocarEvento(Evento* e, int bpm);
@@ -18,7 +17,6 @@ int main() {
     }
     printf("Parsing completo. Executando...\n");
 
-    // Inicializa SDL2
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         fprintf(stderr, "Erro SDL_Init: %s\n", SDL_GetError());
         return 1;
@@ -43,7 +41,7 @@ void tocarEvento(Evento* e, int bpm) {
                 tocarToque(e->instrumento, e->duracao, bpm);
                 break;
             case T_SILENCIO:
-                SDL_Delay(60000 / bpm);  // Espera 1 batida
+                SDL_Delay(60000 / bpm);
                 break;
             case T_REPETICAO:
                 for (int i = 0; i < e->vezes; i++) {
@@ -51,7 +49,6 @@ void tocarEvento(Evento* e, int bpm) {
                 }
                 break;
             case T_AGRUPAMENTO:
-                // Toca os dois eventos em sequência simples
                 tocarEvento(e->esquerda, bpm);
                 tocarEvento(e->direita, bpm);
                 break;
@@ -75,7 +72,6 @@ void tocarToque(int instrumento, int duracao, int bpm) {
     }
     Mix_PlayChannel(-1, som, 0);
 
-    // Espera pela duração da batida multiplicada pelo modificador
     int duracao_ms = (60000 / bpm) * duracao;
     SDL_Delay(duracao_ms);
 

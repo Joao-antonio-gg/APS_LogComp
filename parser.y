@@ -1,7 +1,6 @@
 %{
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 void yyerror(const char *s);
 int yylex(void);
@@ -11,25 +10,21 @@ typedef enum { T_TOQUE, T_SILENCIO, T_REPETICAO, T_AGRUPAMENTO } TipoEvento;
 typedef struct Evento {
     TipoEvento tipo;
 
-    // Para toque
     int instrumento;  // 1=caixa, 2=bumbo
     int duracao;      // 1=!, 2=&, 3=&&, 4=&&& (padrão 1)
 
-    // Para repetição
     struct Evento* filho;
     int vezes;
 
-    // Para agrupamento
     struct Evento* esquerda;
     struct Evento* direita;
 
-    struct Evento* prox; // lista de eventos em compasso
+    struct Evento* prox;
 } Evento;
 
-// Cabeça do programa
 typedef struct {
     int bpm;
-    Evento* compassos; // lista de eventos (compasso simplificado)
+    Evento* compassos;
 } Programa;
 
 Programa programa;
@@ -56,13 +51,11 @@ Evento* adicionaEvento(Evento* lista, Evento* novo);
 %%
 
 programa:
-    '{' NEWLINE bpm_opt compasso_list '}' {
-        printf("Programa parseado. BPM: %d\n", programa.bpm);
-    }
+    '{' NEWLINE bpm_opt compasso_list '}' { printf("Programa parseado. BPM: %d\n", programa.bpm); }
 ;
 
 bpm_opt:
-    /* vazio */ { programa.bpm = 120; } // padrão 120 bpm
+    /* vazio */ { programa.bpm = 120; }
     | BPM IGUAL NUMERO NEWLINE { programa.bpm = $3; }
 ;
 
@@ -88,9 +81,7 @@ evento:
 ;
 
 toque:
-    instrumento modificador_opt {
-        $$ = criaEventoToque($1, $2);
-    }
+    instrumento modificador_opt { $$ = criaEventoToque($1, $2); }
 ;
 
 modificador_opt:
@@ -107,20 +98,14 @@ instrumento:
 ;
 
 repeticao:
-    ABRE_PAREN evento FECHA_PAREN X NUMERO {
-        $$ = criaEventoRepeticao($2, $5);
-    }
+    ABRE_PAREN evento FECHA_PAREN X NUMERO { $$ = criaEventoRepeticao($2, $5); }
 ;
 
 agrupamento:
-    evento MAIS evento {
-        $$ = criaEventoAgrupamento($1, $3);
-    }
+    evento MAIS evento { $$ = criaEventoAgrupamento($1, $3); }
 ;
 
 %%
-
-// Funções para criar e manipular a AST
 
 Evento* criaEventoToque(int instrumento, int duracao) {
     Evento* e = malloc(sizeof(Evento));
