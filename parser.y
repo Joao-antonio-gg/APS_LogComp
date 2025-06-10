@@ -11,11 +11,16 @@
 #include <string.h>
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_mixer.h"
+#include "ast.h" // <--- ADICIONE ESTA LINHA AQUI!
 
 // --- Variáveis Globais ---
-int bpm = 120; // BPM padrão
-Mix_Chunk *som_caixa = NULL;
-Mix_Chunk *som_bumbo = NULL;
+// BPM, som_caixa, som_bumbo agora são declaradas em main.c
+// int bpm = 120;
+// Mix_Chunk *som_caixa = NULL;
+// Mix_Chunk *som_bumbo = NULL;
+
+// Variável global para armazenar a raiz da AST, acessível por main.c
+ASTNode *yyparse_result_program_node = NULL; // <--- DEFINIÇÃO E INICIALIZAÇÃO AQUI
 
 // Funções padrão do Byson/Flex
 int yyerror(const char *s);
@@ -50,10 +55,9 @@ extern FILE *yyin;
 
 // --- Regras da Gramática ---
 
-programa: ABRECHAVES NOVALINHA opt_bpm_def opt_lista_compassos FECHACHAVES { // <--- MODIFICADO AQUI
+programa: ABRECHAVES NOVALINHA opt_bpm_def opt_lista_compassos FECHACHAVES {
     $$ = criar_node_programa($3, $4);
-    executar_programa_ast($$);
-    liberar_ast($$);
+    yyparse_result_program_node = $$; // <--- SALVA A RAIZ DA AST AQUI
 } ;
 
 // BPM é opcional agora, use um não-terminal dedicado para isso
@@ -77,7 +81,7 @@ lista_compassos: compasso { $$ = $1; } // Primeiro compasso
                }
 ;
 
-// NOVO: Regra para a lista de compassos opcional (pode ser vazia)
+// Regra para a lista de compassos opcional (pode ser vazia)
 opt_lista_compassos: lista_compassos { $$ = $1; } // Se houver compassos, usa a lista não-vazia
                    | /* vazio */ { $$ = NULL; }   // Se não houver, a lista é nula
 ;
@@ -116,7 +120,9 @@ agrupamento: evento MAIS evento { $$ = criar_node_agrupamento($1, $3); } ;
 
 %%
 
-// --- Implementação das Funções da AST e de Execução ---
+// --- Implementação das Funções da AST e de Liberação ---
+// As funções criar_node_*, calcular_delay_e_tocar, yyerror e liberar_ast
+// estão agora em ast.h/main.c para melhor organização.
 
 ASTNode* criar_node(NodeType type) {
     ASTNode *node = (ASTNode*)malloc(sizeof(ASTNode));
@@ -196,109 +202,6 @@ ASTNode* adicionar_evento_a_lista(ASTNode *list, ASTNode *event) {
     return list;
 }
 
-
-// --- Funções de Execução da AST ---
-
-void executar_programa_ast(ASTNode *programa_node) {
-    if (!programa_node || programa_node->type != NODE_PROGRAMA) return;
-
-    if (programa_node->data.programa.bpm_node) {
-        bpm = programa_node->data.programa.bpm_node->data.bpm.value;
-    }
-    printf("BPM definido para: %d\n", bpm);
-
-    ASTNode *current_compasso = programa_node->data.programa.compassos;
-    while (current_compasso) {
-        executar_compasso_ast(current_compasso);
-        current_compasso = current_compasso->next;
-    }
-}
-
-void executar_compasso_ast(ASTNode *compasso_node) {
-    if (!compasso_node || compasso_node->type != NODE_COMPASSO) return;
-
-    printf("\n--- Executando compasso ---\n");
-    ASTNode *event_list_node = compasso_node->data.compasso.eventos;
-    if (event_list_node) {
-        ASTNode *current_evento = event_list_node->data.event_list.head;
-        while (current_evento) {
-            executar_evento_ast(current_evento);
-            current_evento = current_evento->next;
-        }
-    }
-}
-
-void executar_evento_ast(ASTNode *evento_node) {
-    if (!evento_node) return;
-
-    switch (evento_node->type) {
-        case NODE_TOQUE:
-            calcular_delay_e_tocar(evento_node->data.toque.instrumento, evento_node->data.toque.modificador);
-            break;
-        case NODE_SILENCIO:
-            printf("Silêncio (delay: %dms)\n", 60000 / bpm);
-            SDL_Delay(60000 / bpm); // Silêncio com duração de uma batida base
-            break;
-        case NODE_REPETICAO:
-            printf("Início Repetição x%d\n", evento_node->data.repeticao.count);
-            for (int i = 0; i < evento_node->data.repeticao.count; i++) {
-                // Percorre a lista de eventos para repetir
-                ASTNode *current_event_to_repeat = evento_node->data.repeticao.eventos_para_repetir->data.event_list.head;
-                while (current_event_to_repeat) {
-                    executar_evento_ast(current_event_to_repeat);
-                    current_event_to_repeat = current_event_to_repeat->next;
-                }
-            }
-            printf("Fim Repetição\n");
-            break;
-        case NODE_AGRUPAMENTO: // Agrupamento sequencial
-            printf("Início Agrupamento (sequencial)\n");
-            executar_evento_ast(evento_node->data.agrupamento.evento1);
-            executar_evento_ast(evento_node->data.agrupamento.evento2);
-            printf("Fim Agrupamento\n");
-            break;
-        case NODE_EVENT_LIST: // Este tipo de nó é para ser usado internamente na AST, não para execução direta
-            fprintf(stderr, "Erro: NODE_EVENT_LIST não deve ser executado diretamente.\n");
-            break;
-        default:
-            fprintf(stderr, "Tipo de nó desconhecido: %d\n", evento_node->type);
-            break;
-    }
-}
-
-// Calcula o delay com base no modificador de tempo e toca o som
-void calcular_delay_e_tocar(char instrumento, const char* modificador) {
-    printf("Tocando %c", instrumento);
-    int delay_ms = 60000 / bpm; // Duração base para uma batida (ex: colcheia, se BPM for 120 e 1 unidade = 1/8)
-
-    if (modificador) {
-        printf(" com modificador %s", modificador);
-        if (strcmp(modificador, "!") == 0) { // Ex: 1/16 (semicolcheia), metade do tempo
-            delay_ms /= 2;
-        } else if (strcmp(modificador, "&") == 0) { // Ex: 1/8 (colcheia), duração base
-            // Sem alteração
-        } else if (strcmp(modificador, "&&") == 0) { // Ex: 1/4 (semínima), dobro do tempo
-            delay_ms *= 2;
-        } else if (strcmp(modificador, "&&&") == 0) { // Ex: 1/2 (mínima), quadruplo do tempo
-            delay_ms *= 4;
-        }
-    }
-    printf(" (delay: %dms)\n", delay_ms);
-
-    if (instrumento == '@') {
-        Mix_PlayChannel(-1, som_caixa, 0);
-    } else if (instrumento == '#') {
-        Mix_PlayChannel(-1, som_bumbo, 0);
-    }
-    SDL_Delay(delay_ms);
-}
-
-// Função de erro do Byson
-int yyerror(const char *s) {
-    fprintf(stderr, "Erro de sintaxe: %s\n", s);
-    return 1;
-}
-
 // Função para liberar a memória da AST (revisada)
 void liberar_ast(ASTNode *node) {
     if (!node) return;
@@ -330,7 +233,6 @@ void liberar_ast(ASTNode *node) {
                     }
                     free(event_list_node); // Libera o nó NODE_EVENT_LIST em si
                 } else if (event_list_node) {
-                    // Caso de erro, se por algum motivo não fosse um NODE_EVENT_LIST
                     liberar_ast(event_list_node);
                 }
             }
@@ -350,12 +252,8 @@ void liberar_ast(ASTNode *node) {
         case NODE_EVENT_LIST:
             // Este nó de lista é um contêiner. Seus conteúdos (eventos) são liberados
             // quando a lista que os contém é processada (ex: NODE_COMPASSO ou NODE_REPETICAO).
-            // Apenas libera o nó NODE_EVENT_LIST em si, não seus filhos diretamente aqui,
-            // para evitar double free se os filhos já foram liberados por um pai.
-            // O caso NODE_COMPASSO acima já itera e libera os filhos da lista de eventos.
             break;
         default:
-            // NODE_BPM, NODE_SILENCIO não possuem ponteiros para liberar recursivamente.
             break;
     }
     // Por último, libera o próprio nó
