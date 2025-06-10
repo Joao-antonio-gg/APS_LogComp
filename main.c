@@ -1,79 +1,56 @@
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_mixer.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "parser.tab.h"
+#include "parser.tab.h" // Inclui as definições de token e a união yylval
+#include "SDL2/SDL.h"
+#include "SDL2/SDL_mixer.h"
+#include "ast.h"         // Inclui as definições da AST e funções
 
-extern Programa programa;
+// Variáveis externas definidas em parser.y
+extern FILE *yyin;
+extern int yyparse();
+extern Mix_Chunk *som_caixa;
+extern Mix_Chunk *som_bumbo;
 
-void tocarEvento(Evento* e, int bpm);
-void tocarToque(int instrumento, int duracao, int bpm);
-
-int main() {
-    printf("Iniciando parser...\n");
-    if (yyparse() != 0) {
-        printf("Erro na análise sintática.\n");
-        return 1;
-    }
-    printf("Parsing completo. Executando...\n");
-
-    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
-        fprintf(stderr, "Erro SDL_Init: %s\n", SDL_GetError());
-        return 1;
-    }
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        fprintf(stderr, "Erro Mix_OpenAudio: %s\n", Mix_GetError());
-        SDL_Quit();
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Uso: %s arquivo_entrada\n", argv[0]);
         return 1;
     }
 
-    tocarEvento(programa.compassos, programa.bpm);
+    yyin = fopen(argv[1], "r");
+    if (!yyin) {
+        perror("Erro ao abrir arquivo");
+        return 1;
+    }
 
+    // Inicialização do SDL e SDL_mixer
+    if (SDL_Init(SDL_INIT_AUDIO) < 0 || Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        fprintf(stderr, "Erro ao inicializar SDL: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    // Carregamento dos arquivos de som
+    som_caixa = Mix_LoadWAV("caixa.wav");
+    som_bumbo = Mix_LoadWAV("bumbo.wav");
+    if (!som_caixa || !som_bumbo) {
+        fprintf(stderr, "Erro ao carregar sons. Verifique se 'caixa.wav' e 'bumbo.wav' estão no mesmo diretório.\n");
+        return 1;
+    }
+
+    printf("Executando parser da linguagem de bateria...\n");
+    int parse_status = yyparse(); // Chama o parser, que agora constrói e executa a AST
+
+    if (parse_status == 0) {
+        printf("Parsing concluído com sucesso.\n");
+    } else {
+        printf("Erro durante o parsing.\n");
+    }
+
+    // Liberação dos recursos do SDL_mixer
+    Mix_FreeChunk(som_caixa);
+    Mix_FreeChunk(som_bumbo);
     Mix_CloseAudio();
     SDL_Quit();
+
     return 0;
-}
-
-void tocarEvento(Evento* e, int bpm) {
-    while (e) {
-        switch (e->tipo) {
-            case T_TOQUE:
-                tocarToque(e->instrumento, e->duracao, bpm);
-                break;
-            case T_SILENCIO:
-                SDL_Delay(60000 / bpm);
-                break;
-            case T_REPETICAO:
-                for (int i = 0; i < e->vezes; i++) {
-                    tocarEvento(e->filho, bpm);
-                }
-                break;
-            case T_AGRUPAMENTO:
-                tocarEvento(e->esquerda, bpm);
-                tocarEvento(e->direita, bpm);
-                break;
-        }
-        e = e->prox;
-    }
-}
-
-void tocarToque(int instrumento, int duracao, int bpm) {
-    const char* arquivo = NULL;
-    switch (instrumento) {
-        case 1: arquivo = "caixa.wav"; break;
-        case 2: arquivo = "bumbo.wav"; break;
-    }
-    if (!arquivo) return;
-
-    Mix_Chunk* som = Mix_LoadWAV(arquivo);
-    if (!som) {
-        fprintf(stderr, "Erro ao carregar som %s: %s\n", arquivo, Mix_GetError());
-        return;
-    }
-    Mix_PlayChannel(-1, som, 0);
-
-    int duracao_ms = (60000 / bpm) * duracao;
-    SDL_Delay(duracao_ms);
-
-    Mix_FreeChunk(som);
 }
