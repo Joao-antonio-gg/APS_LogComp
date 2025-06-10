@@ -72,13 +72,10 @@ ASTNode* criar_node_agrupamento(ASTNode *evento1, ASTNode *evento2);
 ASTNode* criar_node_event_list(ASTNode *event);
 ASTNode* adicionar_evento_a_lista(ASTNode *list, ASTNode *event);
 
-// --- Funções de Execução da AST ---
-void executar_programa_ast(ASTNode *programa_node);
-void executar_compasso_ast(ASTNode *compasso_node);
-void executar_evento_ast(ASTNode *evento_node);
-void calcular_delay_e_tocar(char instrumento, const char* modificador);
+// --- Funções utilitárias (usadas pela VM ou por testes) ---
+void calcular_delay_e_tocar(char instrumento, const char* modificador); // Mantida aqui para acesso pela VM
 
-// --- Função para liberar a AST (declarada aqui) ---
+// --- Função para liberar a AST ---
 void liberar_ast(ASTNode *node);
 
 #endif // AST_H
