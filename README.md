@@ -35,10 +35,10 @@ bpm=120
 (#&)@! x2 |
 ```
 
-### Como Compilar 
+### Como Compilar e Rodar
 ```bash
-bison -d parser.y        
-flex scanner.l           
-gcc parser.tab.c lex.yy.c -o analisador -Wall
-./analisador < entrada.txt
+flex lexer.l
+bison -v -d parser.y
+gcc lex.yy.c parser.tab.c compiler.c main.c -o drum_player -lSDL2 -lSDL2_mixer
+./drum_player exemplo.drum
 ```
